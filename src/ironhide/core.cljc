@@ -256,6 +256,27 @@
     path
     (into prefix path)))
 
+(defn- selectable?
+  "Returuns true when path exists in context (ctx)
+   and false when path not exists in context (ctx).
+   Examples:
+     (selectable? {:b {nil 1}} [:b nil :cc]) => false
+     (selectable? {:b {nil 2}} [:b nil])     => true
+     (selectable? {:b {nil 2}} [:b :c])      => false
+     (selectable? {:a nil} [:a])             => true
+     (selectable? {} [:a])                   => false
+     (selectable? {:b {nil nil}} [:b nil])   => true
+   "
+  [ctx path]
+  (try
+    (let [selected (sp/select-one
+                    [(apply sp/must path) (sp/nil->val :placeholder)]
+                      ctx)]
+      (if (nil? selected)
+        false
+        true))
+    (catch java.lang.IllegalArgumentException e false)))
+
 (defn- apply-rule [ctx rule]
   (let [[from to] (or (:ih/direction rule)
                       (:ih/direction ctx)
@@ -274,7 +295,7 @@
         source-values (get-values ctx full-source-path)
         value         (get-values ctx full-value-path)
 
-        ;; TODO: write a proper empty-result? fn
+        empty-result? (fn [x] (selectable? ctx (get-full-path x [:ih/data to])))
         empty-values? (fn [x] (m-valid? [[nil]] x))
         values        (if (or (empty-values? source-values) (nil? source-path))
                         nil
@@ -287,7 +308,7 @@
          full-sink-path
          values)
 
-        (and (not (empty-values? value)) (not (nil? value-path)))
+        (and (not (empty-result? value)) (not (nil? value-path)))
         (set-values
          ctx
          full-sink-path

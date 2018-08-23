@@ -295,9 +295,9 @@
         source-values (get-values ctx full-source-path)
         value         (get-values ctx full-value-path)
 
-        empty-result? (fn [x] (selectable? ctx (get-full-path x [:ih/data to])))
         empty-values? (fn [x] (m-valid? [[nil]] x))
-        values        (if (or (empty-values? source-values) (nil? source-path))
+        values        (if #_(or (empty-values? source-values) (nil? source-path))
+                          (not (selectable? ctx (path->sp-path full-source-path)))
                         nil
                         source-values)]
     (if sink-path
@@ -308,7 +308,7 @@
          full-sink-path
          values)
 
-        (and (not (empty-result? value)) (not (nil? value-path)))
+        (and (not (empty-values? value)) (not (nil? value-path)))
         (set-values
          ctx
          full-sink-path
@@ -392,3 +392,10 @@
 ;; the result of get-values is a magazine
 ;; 1 2 - is a multi-dimensional address
 ;; :v5 is a bullet
+
+(execute
+ #:ih{:direction [:f :t]
+      :data {:f {:in nil}}
+      :rules [{:f [:in]
+               :t [:out]}]})
+;; => #:ih{:direction [:f :t], :data {:f {:in nil}, :t {:out nil}}, :rules [{:f [:in], :t [:out]}]}

@@ -256,6 +256,17 @@
     path
     (into prefix path)))
 
+(get-values {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*]])
+
+
+(let [p (path->sp-path [:a [:*] [:*]])
+      c {:a [[:v1] [:v2 :v3 :v4]]}]
+  (sp/select
+   (sp/if-path (apply sp/must p) p sp/STOP)
+   c))
+
+(sp/select (path->sp-path [:a [:*] [:*]]) {:a [[:v1] [:v2 :v3 :v4]]})
+
 (defn- selectable?
   "Returuns true when path exists in context (ctx)
    and false when path not exists in context (ctx).
@@ -266,16 +277,15 @@
      (selectable? {:a nil} [:a])             => true
      (selectable? {} [:a])                   => false
      (selectable? {:b {nil nil}} [:b nil])   => true
+     (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*]]) => true
    "
   [ctx path]
-  (try
-    (let [selected (sp/select-one
-                    [(apply sp/must path) (sp/nil->val :placeholder)]
-                      ctx)]
-      (if (nil? selected)
-        false
-        true))
-    (catch java.lang.IllegalArgumentException e false)))
+  (not (empty?
+        (sp/select
+            (sp/if-path (apply sp/must (path->sp-path path))
+                        (path->sp-path path)
+                        sp/STOP)
+            ctx))))
 
 (defn- apply-rule [ctx rule]
   (let [[from to] (or (:ih/direction rule)
@@ -297,7 +307,7 @@
 
         empty-values? (fn [x] (m-valid? [[nil]] x))
         values        (if #_(or (empty-values? source-values) (nil? source-path))
-                          (not (selectable? ctx (path->sp-path full-source-path)))
+                          (not (selectable? ctx full-source-path))
                         nil
                         source-values)]
     (if sink-path

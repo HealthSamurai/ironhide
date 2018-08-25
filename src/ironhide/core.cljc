@@ -266,12 +266,16 @@
 (nil? (some #(nil? %)
             (sp/select TREE-VALUES
                        (sp/select
-                        (path->sp-path [:a [:*] [:*]])
+                        (path->sp-path [:allergies [:*] :category])
+                        (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:allergies [{:reaction "anemia" :category "food"} {:category "good"}]}))
+                       #_(sp/select
+                        (path->sp-path [:a [:*] [:*] :w])
                         (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:a [[:v1] [:v2 :v3 :v4]]})))))
 
+
 (sp/select
- (path->sp-path [:a [:*] [:*] :w])
- (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:a [[:v1] [:v2 :v3 :v4]]}))
+ (path->sp-path [:allergies [:*] :category])
+ (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:allergies [{:reaction "anemia" :category "food"} {:category "good"}]}))
 
 (sp/select
  TREE-VALUES
@@ -309,10 +313,12 @@
      (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*] :w]) => false
    "
   [ctx path]
+  ;; (println "selectable? ctx = " ctx)
+  (println "selectable? path = " path)
   (nil? (some #(nil? %)
             (sp/select TREE-VALUES
                        (sp/select
-                        (path->sp-path (path->sp-path path))
+                        (path->sp-path path)
                         (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) ctx))))))
 
 (defn- apply-rule [ctx rule]
@@ -335,9 +341,19 @@
 
         empty-values? (fn [x] (m-valid? [[nil]] x))
         values        (if #_(or (empty-values? source-values) (nil? source-path))
-                          (not (selectable? ctx full-source-path))
+                          (do (println "old = " (or (empty-values? source-values) (nil? source-path)))
+                              (println "new = " (or (not (selectable? ctx full-source-path)) (nil? source-path)))
+                              (or (not (selectable? ctx full-source-path)) (nil? source-path)))
                         nil
                         source-values)]
+    (println "source-values = " source-values)
+    (println "full-source-path = " full-source-path)
+    (println "source-path = " source-path)
+    (println "full-value-path = " full-value-path)
+    (println "value-path = " value-path)
+    (println "values = " values)
+    (println "sink-path = " sink-path)
+    (println "-------")
     (if sink-path
       (cond
         values
@@ -346,7 +362,7 @@
          full-sink-path
          values)
 
-        (and (not (empty-values? value)) (not (nil? value-path)))
+        (and (selectable? ctx full-value-path) (not (nil? value-path)))
         (set-values
          ctx
          full-sink-path
@@ -437,3 +453,29 @@
       :rules [{:f [:in]
                :t [:out]}]})
 ;; => #:ih{:direction [:f :t], :data {:f {:in nil}, :t {:out nil}}, :rules [{:f [:in], :t [:out]}]}
+
+(->
+    #:ih {:direction [:form :fhir]
+          :data      {:form {:allergies [{:reaction "anemia"
+                                          :category "food"}
+                                         {:category "good"}]}
+                      :fhir {}}
+          :values    {:allergy-rt "AllergyIntolerance"
+                      :patient-rt "Patient"
+                      :patient-id "uuid-blblablabla"
+                      :vector     []}
+
+          :rules [;; {:ih/value {:fhir [:vector]}
+                  ;;  :fhir     [:allergies]}
+                  {:form [:allergies [:*] :category]
+                   :fhir [:allergies [:*] :category]}
+                  {:ih/value {:fhir [:allergy-rt]}
+                   :fhir     [:allergies [:*] :resourceType]}
+                  {:ih/value {:fhir [:patient-id]}
+                   :fhir     [:allergies [:*] :patient :id]}
+                  {:ih/value {:fhir [:patient-rt]}
+                   :fhir     [:allergies [:*] :patient :resourceType]}]}
+    (execute)
+    :ih/data
+    )
+

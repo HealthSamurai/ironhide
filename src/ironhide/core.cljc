@@ -56,6 +56,14 @@
 
 (def ^:private ALL-INDEXED [sp/INDEXED-VALS (sp/collect-one 0) 1])
 
+(def ^:private TREE-VALUES
+	(sp/recursive-path [] p
+	  (sp/if-path vector?
+                      [sp/ALL p]
+                      (sp/if-path map?
+                                  [sp/MAP-VALS p]
+                                  sp/STAY))))
+
 (defn- vfilter->template [vfilter next-pelem]
   (if vfilter
     vfilter
@@ -256,49 +264,6 @@
     path
     (into prefix path)))
 
-(def TREE-VALUES
-	(sp/recursive-path [] p
-	  (sp/if-path vector?
-                      [sp/ALL p]
-                      (sp/if-path map?
-                                  [sp/MAP-VALS p]
-                                  sp/STAY))))
-(nil? (some #(nil? %)
-            (sp/select TREE-VALUES
-                       (sp/select
-                        (path->sp-path [:allergies [:*] :category])
-                        (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:allergies [{:reaction "anemia" :category "food"} {:category "good"}]}))
-                       #_(sp/select
-                        (path->sp-path [:a [:*] [:*] :w])
-                        (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:a [[:v1] [:v2 :v3 :v4]]})))))
-
-
-(sp/select
- (path->sp-path [:allergies [:*] :category])
- (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:allergies [{:reaction "anemia" :category "food"} {:category "good"}]}))
-
-(sp/select
- TREE-VALUES
- #_(sp/if-path
-  (sp/must (path->sp-path [:a [:*] [:*]]))
-  (path->sp-path [:a [:*] [:*]])
-  sp/STOP)
- {:a [[:v1] [:v2 :v3 :v4]]})
-
-
-(sp/transform TREE-VALUES #(if (nil? %) :placeholder %) [1 [nil {nil nil} 5] [[6]]])
-
-
-(sp/select-one! sp/FIRST (range 5))
-
-(let [p (path->sp-path [:d [:*]])
-      c {:a [[:v1] [:v2 :v3 :v4]] :d {:w :e}}]
-  (sp/select
-   (sp/if-path (apply sp/must p) p sp/STOP)
-   c))
-
-(sp/select (path->sp-path [:a [:*] [:*]]) {:a [[:v1] [:v2 :v3 :v4]]})
-
 (defn- selectable?
   "Returns true when ironhide path exists in context (ctx)
    and false when ironhide path not exists in context (ctx).
@@ -446,36 +411,4 @@
 ;; the result of get-values is a magazine
 ;; 1 2 - is a multi-dimensional address
 ;; :v5 is a bullet
-
-(execute
- #:ih{:direction [:f :t]
-      :data {:f {:in nil}}
-      :rules [{:f [:in]
-               :t [:out]}]})
-;; => #:ih{:direction [:f :t], :data {:f {:in nil}, :t {:out nil}}, :rules [{:f [:in], :t [:out]}]}
-
-(->
-    #:ih {:direction [:form :fhir]
-          :data      {:form {:allergies [{:reaction "anemia"
-                                          :category "food"}
-                                         {:category "good"}]}
-                      :fhir {}}
-          :values    {:allergy-rt "AllergyIntolerance"
-                      :patient-rt "Patient"
-                      :patient-id "uuid-blblablabla"
-                      :vector     []}
-
-          :rules [;; {:ih/value {:fhir [:vector]}
-                  ;;  :fhir     [:allergies]}
-                  {:form [:allergies [:*] :category]
-                   :fhir [:allergies [:*] :category]}
-                  {:ih/value {:fhir [:allergy-rt]}
-                   :fhir     [:allergies [:*] :resourceType]}
-                  {:ih/value {:fhir [:patient-id]}
-                   :fhir     [:allergies [:*] :patient :id]}
-                  {:ih/value {:fhir [:patient-rt]}
-                   :fhir     [:allergies [:*] :patient :resourceType]}]}
-    (execute)
-    :ih/data
-    )
 

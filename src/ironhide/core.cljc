@@ -278,8 +278,6 @@
      (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*] :w]) => false
    "
   [ctx path]
-  ;; (println "selectable? ctx = " ctx)
-  (println "selectable? path = " path)
   (nil? (some #(nil? %)
             (sp/select TREE-VALUES
                        (sp/select
@@ -305,20 +303,9 @@
         value         (get-values ctx full-value-path)
 
         empty-values? (fn [x] (m-valid? [[nil]] x))
-        values        (if #_(or (empty-values? source-values) (nil? source-path))
-                          (do (println "old = " (or (empty-values? source-values) (nil? source-path)))
-                              (println "new = " (or (not (selectable? ctx full-source-path)) (nil? source-path)))
-                              (or (not (selectable? ctx full-source-path)) (nil? source-path)))
+        values        (if (or (not (selectable? ctx full-source-path)) (nil? source-path))
                         nil
                         source-values)]
-    (println "source-values = " source-values)
-    (println "full-source-path = " full-source-path)
-    (println "source-path = " source-path)
-    (println "full-value-path = " full-value-path)
-    (println "value-path = " value-path)
-    (println "values = " values)
-    (println "sink-path = " sink-path)
-    (println "-------")
     (if sink-path
       (cond
         values

@@ -107,21 +107,6 @@
     nil)))
 
 
-;; (get-value {:name [{:given ["test" :value]}]} [:name [0] :given [0]])
-;; => [["test"]]
-
-;; (set-values
-;;  [{:d :t1
-;;    :v [{:k 0} {:k 1}]}
-
-;;   {:d :t2
-;;    :v [{} {}]}
-
-;;   {:d :t1
-;;    :v [{:k 2} {:k 3}]}]
-;;  [[:* {:d :t1}] :v [:*] :k]
-;;  (get-values [[:v1] [:v2 :v3]] [[:*] [:*]]))
-
 (deftest extract-test
   (def nested-structure
     {:a {:b [{:c 1 :d 2}
@@ -148,23 +133,6 @@
   (matcho/assert
    [[0 0 "test"] [0 1 :value]]
    (tf/get-values {:name [{:given ["test" :value]}]} [:name [:*] :given [:*]])))
-
-(deftest set-value-test
-  ;; (matcho/assert
-  ;;  {:a [identity identity identity {:c 1 :v :test}]}
-  ;;  (tf/set-value
-  ;;   {:a [:first-value
-  ;;        {:c 1 :v 1}
-  ;;        :second
-  ;;        {:c 1 :v 11}]}
-  ;;   {}
-  ;;   [:a {:c 1} [1] :v] :test))
-
-  ;; (matcho/assert
-  ;;  {:a [{:c 1 :v [{:d 2 :s :test}]}]}
-  ;;  {}
-  ;;  (tf/set-value {} [:a {:c 1} [] :v {:d 2} [] :s] :test))
-  )
 
 
 (def ds1
@@ -274,37 +242,42 @@
       :sink   [[:*] [:*]]}]
     [:source :sink])))
 
+(deftest hl7-address
 
-(transform
- [{:address ["123 HAPPY AVE"
-             "NOWHERE TOWN"
-             "ALBUKERKA"
-             "CA"
-             "98000"
-             "USA"]
-   :name "blabl"}]
- nil
- [{:hl7 [[:*] :address [0]]
-   :fhir [:address [:*] :line [0]]}
-  ;; {:hl7  [:address [1]]
-  ;;  :fhir [:address :line [1]]}
-  ;; {:hl7  [:address [2]]
-  ;;  :fhir [:address :line [2]]}
+  (matcho/assert
+   {:address
+    [{:line       ["123 HAPPY AVE" "NOWHERE TOWN" "ALBUKERKA"]
+      :city       "ALBUKERKA"
+      :state      "CA"
+      :postalCode "98000"
+      :country    "USA"}]}
+   (transform
+    [{:address ["123 HAPPY AVE"
+                "NOWHERE TOWN"
+                "ALBUKERKA"
+                "CA"
+                "98000"
+                "USA"]
+      :name    "blabl"}]
+    nil
+    [{:hl7  [[:*] :address [0]]
+      :fhir [:address [:*] :line [0]]}
+     {:hl7  [[:*] :address [1]]
+      :fhir [:address [:*] :line [1]]}
+     {:hl7  [[:*] :address [2]]
+      :fhir [:address [:*] :line [2]]}
 
-  ;; {:hl7  [:address [2]]
-  ;;  :fhir [:address :city]}
-  ;; {:hl7  [:address [3]]
-  ;;  :fhir [:address :state]}
-  ;; {:hl7  [:address [4]]
-  ;;  :fhir [:address :postalCode]}
-  ;; {:hl7  [:address [5]]
-  ;;  :fhir [:address :country]}
-  ]
+     {:hl7  [[:*] :address [2]]
+      :fhir [:address [:*] :city]}
+     {:hl7  [[:*] :address [3]]
+      :fhir [:address [:*] :state]}
+     {:hl7  [[:*] :address [4]]
+      :fhir [:address [:*] :postalCode]}
+     {:hl7  [[:*] :address [5]]
+      :fhir [:address [:*] :country]}]
 
- [:hl7 :fhir]
- )
+    [:hl7 :fhir])))
 
-(sp/setval [(sp/filterer (constantly true)) 1] :test [:a])
 
 (deftest form-fhir-transform-test
   (def sample-data
@@ -321,8 +294,7 @@
      :demographics-patientInfo-email             "ivanpetrov@email.com"})
 
   (def form-fhir-rules
-    [
-     {:form [:allergies-knownAllergies [:*]]
+    [{:form [:allergies-knownAllergies [:*]]
 
       :fhir
       [:allergies
@@ -411,301 +383,26 @@
        name-rules
        [:fhir :form]))))
 
-  ;; #spy/p
-  ;; (transform sample-data {} form-fhir-rules [:form :fhir])
+  (matcho/assert
+   {:allergies
+    [{:verificationStatus "confirmed",
+      :resourceType       "AllergyIntolerance",
+      :patient
+      {:resourceType "Patient", :id "a087966b-41c6-450b-a386-106bfaa1bb72"},
+      :code               102002}
+     {:verificationStatus "confirmed",
+      :resourceType       "AllergyIntolerance",
+      :patient
+      {:resourceType "Patient", :id "a087966b-41c6-450b-a386-106bfaa1bb72"},
+      :code               8429000}],
+    :birthDate "2010-10-10",
+    :name      [{:given ["Ivan P"], :family "trov"}],
+    :telecom
+    [{:system "phone", :value "+12222222222"}
+     {:system "email", :value "ivanpetrov@email.com"}],
+    :gender    "Male"}
+   (transform sample-data {} form-fhir-rules [:form :fhir])))
 
-  ;; (tf/transform {:name [{:family "Petrov" :given ["Ivan"]}]}
-  ;;               {}
-  ;;               form-fhir-rules
-  ;;               [:fhir :form])
-
-  )
-
-
-(defn gen-uuid! []
-  (str (java.util.UUID/randomUUID)))
-
-;; (defmethod u/*fn ::create-ctx
-;;   [ctx]
-;;   {:form-data (->
-;;                (io/resource "definitions/sample-form.edn")
-;;                slurp
-;;                edn/read-string
-;;                :data)
-;;    :bundle    []})
-
-;; (defmethod u/*fn ::init-ids
-;;  [ctx]
-;;   {:ids {:patient/id (gen-uuid!)}})
-
-;; (defmethod u/*fn ::fhir-patient
-;;   [{bundle                   :bundle
-;;     form-data                :form-data
-;;     {id :patient/id :as ids} :ids :as ctx}]
-;;   (let [{pname  :demographic-patientInfo-name
-;;          gender :demographic-patientInfo-gender
-;;          dob    :demographic-patientInfo-dob
-;;          mrn    :demographic-patientInfo-mrn
-;;          phone  :demographics-patientInfo-cellPhoneNumber
-;;          email  :demographics-patientInfo-email} form-data
-
-;;         [first-name family] (cstr/split pname #" ")]
-;;     {:bundle
-;;      (->>
-;;       {:id           id
-;;        :resourceType "Patient"
-;;        :name         [{:given  [first-name]
-;;                        :family family}]
-;;        :gender       (cstr/lower-case gender)
-;;        :birthDate    dob
-;;        :telecom      [{:system "phone"
-;;                        :value  phone}
-;;                       {:system "email"
-;;                        :value  email}]}
-;;       (conj bundle))}))
-
-
-;; (defmethod u/*fn ::fhir-allergies
-;;   [{bundle                   :bundle
-;;     form-data                :form-data
-;;     {patient-id :patient/id} :ids
-;;     :as                      ctx}]
-;;   {:bundle
-
-;;    (->>
-;;     (map (fn [x]
-;;            {:verificationStatus "confirmed"
-;;             :resourceType       "AllergyIntolerance"
-;;             :code               {:id x}
-;;             :patient            {:resourceType "Patient"
-;;                                  :id           patient-id}})
-;;          (:allergies-knownAllergies form-data))
-;;     (concat bundle))})
-
-;; (defn publish-patient [patient]
-;;   (http/put
-;;    (str "http://localhost:8080/Patient/" (:id patient))
-;;    {:headers {:content-type "application/json"}
-;;     :body (json/generate-string patient)}))
-
-(def fhir<->uhn
-  {:rules
-   [;; {0 [:patient :name [0] :given [0]]
-    ;;  1 [:demographic-patientInfo-firstname]
-
-    ;;  :convert {0 identity ;; cstr/upper-case
-    ;;            1 identity}}
-
-    ;; {0 [:patient :id]
-
-    ;;  :default {0 :patient/id}}
-
-    ;; {0 [:patient :resourceType]
-
-    ;;  :default {0 "Patient"}}
-
-    ;; {0 [:patient :name 0 :family]
-    ;;  1 [:demographic-patientInfo-lastname]}
-
-    ;; {0 [:patient :gender]
-    ;;  1 [:demographic-patientInfo-gender]
-
-    ;;  :convert {0 {"Male"   "male"
-    ;;               "Female" "female"}}}
-
-    ;; {0 [:patient :telecom {:system "phone"} [0] :value]
-    ;;  1 [:demographics-patientInfo-cellPhoneNumber]}
-
-    {0 [:allergies {:verificationStatus "confirmed"
-                    :resourceType       "AllergyIntolerance"
-                    :patient            {:resourceType "Patient"
-                                         :id           :patient/id}}
-        []
-        :code :id]
-     1 [:allergies-knownAllergies []]}
-
-    ]})
-
-;; (def form-data
-;;   (->
-;;    (u/*apply [::create-ctx] {})
-;;    :form-data))
-
-
-
-;; (clojure.pprint/pprint
-;;  (transform form-data {} (:rules fhir<->uhn) [1 0]))
-
-
-;; (tf/get-value [[1 2] [3]] [[:*] [:*]])
-;; => [[0 0 1] [0 1 2] [1 0 3]]
-;; (tf/get-value [[[1 2] [3 4 5]] [[6 7 8] [9 0]]]
-;;               [[:*] [:*] [:*]])
-;; => [
-;; [0 0 0 1] [0 0 1 2] [0 1 0 3] [0 1 1 4] [0 1 2 5]
-;; [1 0 0 6] [1 0 1 7] [1 0 2 8] [1 1 0 9] [1 1 1 0]]
-;; [[2]
-;;  [2 2]
-;;  [2 3 3 2]]
-
-(def src
-  [[[:v1 :v2 :v3] [:v3 :v4 :v5]] [[:v6 :v7 :v8] [:v9 :v0 :v10]]])
-
-(def sink
-  [[[1 2] [3 4 5]] [[6 7 8] [9 0]]])
-
-
-;; (count-branching sink [[:*] :a :b [:*] :c])
-
-
-;; (println :=======)
-;; (println
-;;  (fillup-acc src sink [[:*] [:*] [:*]] [[:*] [:*] [:*]]))
-;; => [((0) (0 0) (1 0 0 1)) ([] [] nil) [[] [[:*]] [[:*] [:*]]]]
-
-;; (sp/setval
-;;  [
-;;   ALL-INDEXED
-;;   sp/END
-;;   ]
-;;  [:test]
-;;  sink
-;;  )
-
-;; (sp/select
-;;  [sp/ALL
-;;   sp/ALL
-;;   ALL-INDEXED]
-;;  sink)
-
-;; (sp/setval
-;;  ;; [:b (sp/filterer (constantly true)) sp/NIL->VECTOR sp/ALL :c]
-;;  (:insert-path ip)
-;;  ;; [:v1 :v2 :v3]
-;;  ;; (fn [i x] (get [:v1 :v2 :v3] i))
-;;  ds2)
-
-;; (sp/setval [:a (sp/filterer (constantly true)) :c] [:v3 :v4] {:a [{:c :v1} {:c :v2}]})
-;; (sp/select [sp/INDEXED-VALS] [:v3 :v4])
-
-;; (sp/select
-;;  [:a sp/INDEXED-VALS (sp/collect-one 0) 1]
-;;  ;; (fn [i x] (get [7 5 3] i))
-;;  {:a [{:c :v1} {:c :v2}]})
-
-;; (set-value {} [:a {:c 1} [] :v {:d 2} [] :s] :test)
-;; (println :===========)
-;; (set-value {:a [1 2]} [:a []] :test) 
-;; (sp/select [:a sp/ALL] {:a [1 2]})
-;; (set-value {} [:patient :id] :patient/id)
-
-;; (defn- fill-with-templates [acc path values]
-;;   (let [{:keys [insert-path sub-paths]
-;;          :as   paths} (get-insert-paths path)
-;;         cardinalities (get-max-cardinality values)]
-;;     ;; (loop [acc acc [[sp value] & rps :as sps] sub-paths i 0]
-;;     ;;   ;; (clojure.pprint/pprint value)
-;;     ;;   (if (not-empty sps)
-;;     ;;     (let [insert-subpath (conj (into [] (drop-last sp)) sp/AFTER-ELEM)
-;;     ;;           selected-count (count (sp/select sp acc))
-;;     ;;           ;; _ (println sp)
-;;     ;;           ;; _              (println ">>>>" (sp/select sp acc) selected-count i)
-;;     ;;           ;; new-acc        (if (not= count 0)
-;;     ;;           ;;                  (sp/setval insert-subpath value acc)
-;;     ;;           ;;                  acc)
-;;     ;;           new-acc        acc
-;;     ;;           ]
-;;     ;;       (recur new-acc rps (inc i)))
-;;     ;;     acc))
-;;     ))
-
-;; (defn get-real-insert-path [path]
-;;   (reduce
-;;    (fn [acc x]
-;;      (let [next-step (if map?)])
-;;      (conj acc next-step)
-;;      )
-;;    []
-;;    path)
-;;   )
-
-;; [:a {} [] :c]
-;; [:a filterer sp/INDEXD]
-;; [path v] -> {path v}
-
-;; (sp/setval
-;;  [0 (sp/nil->val {}) :a]
-;;  :test
-;;  [])
-
-
-(comment
-  (println "=======================")
-  (clojure.pprint/pprint form-data)
-  (println "-----------------------")
-
-  (def fhir-bundle
-    (->
-     form-data
-     (transform (:rules fhir<->uhn) [1 0])
-     clojure.pprint/pprint))
-
-  (println "-----------------------")
-  (clojure.pprint/pprint
-   (->
-    (u/*apply [::create-ctx ::init-ids ::fhir-patient ::fhir-allergies] {})
-    :bundle
-    ;; first
-    ;; publish-patient
-    ))
-  (println "=======================")
-
-
-  (get-values {:a {:b [{:c 2 :d 3} {:c 2 :d 4}]}} [:a :b {:c 2} ])
-
-  (sp/select [:a :b (sp/filterer #(m/valid? {:c 2} %)) sp/ALL]
-             {:a {:b [{:c 2 :d 3} {:c 2 :d 4}]}})
-
-  (set-values {} [:a {:c 1} [] :v {:d 2} [] :s] :test))
-
-;; (def transformer
-;;   #:ih{:micros #:ihm {:telecom    [:telecom [:%1] :value]
-;;                       :first-name [:name [0] :given [0]]}
-
-;;        :data {:form {:name "Test Name"}
-;;               :fhir {}}
-
-;;        :values {:patient-id "Patient/UUID"} ;; should be attacheable
-
-;;        :direction [:form :fhir]
-
-;;        :rules
-;;        [{:ih/direction [:sub-form :fhir]
-;;          :sub-form     [:name :ihp/str<->vector [0]]
-;;          :ih/defaults  {:fhir [:ih/values :patient-id]}
-;;          :fhir         [:ihm/first-name]}]})
-
-
-;; #spy/p
-;; (get-data
-;;  #:ih{:direction [:form :fhir]
-;;       :data      {:form {:first-name "Firstname"}
-;;                   :fhir {}}
-;;       :rules     [{:form [:first-name]
-;;                    :fhir [:name [0] :given [0]]}]})
-;; => {:form {:first-name "Firstname"}, :fhir {:name [{:given ["Firstname"]}]}}
-
-;; #spy/p
-;; (json/parse-string
-;;  (json/generate-string transformer)
-;;  true)
-
-;; #spy/p
-;; (transform-once transformation (first (:ih/rules transformation))),
-
-;; (println :========)
-;; #spy/p
-;; (get-data transformer :fhir)
 
 (deftest fill-from-value
   (matcho/assert
@@ -736,7 +433,43 @@
                    :fhir     [:allergies [:*] :patient :resourceType]}]}
     (execute)
     :ih/data
-    :fhir)))
+    :fhir
+    )))
+
+:patient-shell
+:patient-mrn-shell
+:name-shell
+:practitioner-shell
+
+{:patients []
+ :practitoners []}
+[:patient-shell :practitioner-shell]
+
+(->
+ #:ih {:direction [:left :right]
+
+       :values {:default-name "Name not provided"
+                :types [1]}
+       :rules  [{:left [:allergies [:*]]
+                 :right [:my-allergies [:*]]
+                 ;; :ih/nested-shell [:name :id] :form<->fhir-allergy
+                 }
+
+                ;; [:form :intermediate :fhir]
+                ;; [:form :intermediate]
+                ;; [:intermediate :fhir]
+
+                {:ih/value {:right [:default-name]}
+                 :left [:ih/values :types [:*]]
+                 :right    [:my-allergies [:*] :type]}
+                ]
+
+       :data {:left {:allergies [{:reaction "animea"} {:reaction "other"}]}
+              :right {:allergies [{} {} {:type "super"}]}
+              }}
+ execute
+ :ih/data
+ :right)
 
 (deftest copy-nils-test
   (testing "Basic nil copying"

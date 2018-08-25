@@ -256,11 +256,39 @@
     path
     (into prefix path)))
 
-(get-values {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*]])
+(def TREE-VALUES
+	(sp/recursive-path [] p
+	  (sp/if-path vector?
+                      [sp/ALL p]
+                      (sp/if-path map?
+                                  [sp/MAP-VALS p]
+                                  sp/STAY))))
+(nil? (some #(nil? %)
+            (sp/select TREE-VALUES
+                       (sp/select
+                        (path->sp-path [:a [:*] [:*]])
+                        (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:a [[:v1] [:v2 :v3 :v4]]})))))
+
+(sp/select
+ (path->sp-path [:a [:*] [:*] :w])
+ (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) {:a [[:v1] [:v2 :v3 :v4]]}))
+
+(sp/select
+ TREE-VALUES
+ #_(sp/if-path
+  (sp/must (path->sp-path [:a [:*] [:*]]))
+  (path->sp-path [:a [:*] [:*]])
+  sp/STOP)
+ {:a [[:v1] [:v2 :v3 :v4]]})
 
 
-(let [p (path->sp-path [:a [:*] [:*]])
-      c {:a [[:v1] [:v2 :v3 :v4]]}]
+(sp/transform TREE-VALUES #(if (nil? %) :placeholder %) [1 [nil {nil nil} 5] [[6]]])
+
+
+(sp/select-one! sp/FIRST (range 5))
+
+(let [p (path->sp-path [:d [:*]])
+      c {:a [[:v1] [:v2 :v3 :v4]] :d {:w :e}}]
   (sp/select
    (sp/if-path (apply sp/must p) p sp/STOP)
    c))
@@ -268,8 +296,8 @@
 (sp/select (path->sp-path [:a [:*] [:*]]) {:a [[:v1] [:v2 :v3 :v4]]})
 
 (defn- selectable?
-  "Returuns true when path exists in context (ctx)
-   and false when path not exists in context (ctx).
+  "Returns true when ironhide path exists in context (ctx)
+   and false when ironhide path not exists in context (ctx).
    Examples:
      (selectable? {:b {nil 1}} [:b nil :cc]) => false
      (selectable? {:b {nil 2}} [:b nil])     => true
@@ -277,15 +305,15 @@
      (selectable? {:a nil} [:a])             => true
      (selectable? {} [:a])                   => false
      (selectable? {:b {nil nil}} [:b nil])   => true
-     (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*]]) => true
+     (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*]])    => true
+     (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*] :w]) => false
    "
   [ctx path]
-  (not (empty?
-        (sp/select
-            (sp/if-path (apply sp/must (path->sp-path path))
-                        (path->sp-path path)
-                        sp/STOP)
-            ctx))))
+  (nil? (some #(nil? %)
+            (sp/select TREE-VALUES
+                       (sp/select
+                        (path->sp-path (path->sp-path path))
+                        (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) ctx))))))
 
 (defn- apply-rule [ctx rule]
   (let [[from to] (or (:ih/direction rule)

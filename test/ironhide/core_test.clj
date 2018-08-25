@@ -737,3 +737,15 @@
     (execute)
     :ih/data
     :fhir)))
+
+(deftest copy-nils-test
+  (testing "Basic nil copying"
+    (matcho/assert
+     {:f {:in nil}, :t {:out nil}}
+     (->
+      #:ih{:direction [:f :t]
+           :data {:f {:in nil}}
+           :rules [{:f [:in]
+                    :t [:out]}]}
+      (execute)
+      :ih/data))))

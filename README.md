@@ -135,9 +135,9 @@ healthsamurai/ironhide {:mvn/version "RELEASE"}
   #:ih{:direction [:form :form-2]
 
        :values {:person/name "Name not provided by the form"}
-       :rules  [{:form        [:name]
-                 :form-2      [:fullname]
-                 :ih/defaults {:form-2 [:ih/values :person/name]}}]
+       :rules  [{:form     [:name]
+                 :form-2   [:fullname]
+                 :ih/value {:form-2 [:ih/values :person/name]}}]
        :data   {:form   {}
                 :form-2 {:fullname "Old Name"}}})
 

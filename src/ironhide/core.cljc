@@ -56,6 +56,14 @@
 
 (def ^:private ALL-INDEXED [sp/INDEXED-VALS (sp/collect-one 0) 1])
 
+(def ^:private TREE-VALUES
+	(sp/recursive-path [] p
+	  (sp/if-path vector?
+                      [sp/ALL p]
+                      (sp/if-path map?
+                                  [sp/MAP-VALS p]
+                                  sp/STAY))))
+
 (defn- vfilter->template [vfilter next-pelem]
   (if vfilter
     vfilter
@@ -256,6 +264,25 @@
     path
     (into prefix path)))
 
+(defn- selectable?
+  "Returns true when ironhide path exists in context (ctx)
+   and false when ironhide path not exists in context (ctx).
+   Examples:
+     (selectable? {:b {nil 1}} [:b nil :cc]) => false
+     (selectable? {:b {nil 2}} [:b nil])     => true
+     (selectable? {:b {nil 2}} [:b :c])      => false
+     (selectable? {:a nil} [:a])             => true
+     (selectable? {} [:a])                   => false
+     (selectable? {:b {nil nil}} [:b nil])   => true
+     (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*]])    => true
+     (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*] :w]) => false
+   "
+  [ctx path]
+  (not-any? nil? (sp/select TREE-VALUES
+                     (sp/select
+                      (path->sp-path path)
+                      (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) ctx)))))
+
 (defn- apply-rule [ctx rule]
   (let [[from to] (or (:ih/direction rule)
                       (:ih/direction ctx)
@@ -274,9 +301,8 @@
         source-values (get-values ctx full-source-path)
         value         (get-values ctx full-value-path)
 
-        ;; TODO: write a proper empty-result? fn
         empty-values? (fn [x] (m-valid? [[nil]] x))
-        values        (if (or (empty-values? source-values) (nil? source-path))
+        values        (if (or (not (selectable? ctx full-source-path)) (nil? source-path))
                         nil
                         source-values)]
     (if sink-path
@@ -287,7 +313,7 @@
          full-sink-path
          values)
 
-        (and (not (empty-values? value)) (not (nil? value-path)))
+        (and (selectable? ctx full-value-path) (not (nil? value-path)))
         (set-values
          ctx
          full-sink-path
@@ -371,3 +397,4 @@
 ;; the result of get-values is a magazine
 ;; 1 2 - is a multi-dimensional address
 ;; :v5 is a bullet
+

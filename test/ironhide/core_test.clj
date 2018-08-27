@@ -470,3 +470,46 @@
  execute
  :ih/data
  :right)
+
+(deftest copy-nils-test
+  (testing "Basic nil copying"
+    (matcho/assert
+     {:f {:in nil}, :t {:out nil}}
+     (->
+      #:ih{:direction [:f :t]
+           :data {:f {:in nil}}
+           :rules [{:f [:in]
+                    :t [:out]}]}
+      (execute)
+      :ih/data)))
+  (testing "Deep nil copying"
+    (matcho/assert
+     {:f {:in {:layer [nil]}}, :t {:out [nil]}}
+     (->
+      #:ih{:direction [:f :t]
+           :data {:f {:in {:layer [nil]}}}
+           :rules [{:f [:in :layer]
+                    :t [:out]}]}
+      (execute)
+      :ih/data)))
+  (testing "Nil copying with wildcards"
+    (matcho/assert
+     {:form {:phones [{:txt nil}
+                      {:txt "+2 222"}]}
+      :fhir {:telecom [{:system "phone"
+                          :value  nil}
+                         {:system "phone"
+                          :value  "+2 222"}]}}
+    (->
+     #:ih{:direction [:form :fhir]
+
+          :rules [{:form [:phones [:*] :txt]
+                   :fhir [:telecom [:*] :value]}]
+          :data  {:form {:phones [{:txt nil}
+                                  {:txt "+2 222"}]}
+                  :fhir {:telecom [{:system "phone"
+                                    :value  "+3 333"}
+                                   {:system "phone"
+                                    :value  "+4 444"}]}}}
+     (execute)
+     :ih/data))))

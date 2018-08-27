@@ -278,11 +278,10 @@
      (selectable? {:a [[:v1] [:v2 :v3 :v4]]} [:a [:*] [:*] :w]) => false
    "
   [ctx path]
-  (nil? (some #(nil? %)
-            (sp/select TREE-VALUES
-                       (sp/select
-                        (path->sp-path path)
-                        (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) ctx))))))
+  (not-any? nil? (sp/select TREE-VALUES
+                     (sp/select
+                      (path->sp-path path)
+                      (sp/transform TREE-VALUES #(if (nil? %) :placeholder %) ctx)))))
 
 (defn- apply-rule [ctx rule]
   (let [[from to] (or (:ih/direction rule)
